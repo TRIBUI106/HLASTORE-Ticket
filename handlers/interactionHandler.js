@@ -1,4 +1,3 @@
-// File: handlers/interactionHandler.js
 const {
   EmbedBuilder,
   ActionRowBuilder,
@@ -12,7 +11,7 @@ const {
 const {
   closedTicketCategory,
   ticketCategory,
-  roleSupport,
+  roleSupport, // Đây giờ là một mảng
 } = require("../config.js");
 
 module.exports = async (interaction) => {
@@ -42,7 +41,8 @@ module.exports = async (interaction) => {
 
       await interaction.showModal(modal);
     } else if (interaction.customId === "lock_ticket") {
-      if (!member.roles.cache.has(roleSupport)) {
+      // Kiểm tra xem thành viên có ít nhất 1 trong 2 role support
+      if (!roleSupport.some((roleId) => member.roles.cache.has(roleId))) {
         return interaction.reply({
           content: "❌ Bạn không có quyền sử dụng chức năng này!",
           ephemeral: true,
@@ -66,7 +66,8 @@ module.exports = async (interaction) => {
         ],
       });
     } else if (interaction.customId === "unlock_ticket") {
-      if (!member.roles.cache.has(roleSupport)) {
+      // Kiểm tra tương tự
+      if (!roleSupport.some((roleId) => member.roles.cache.has(roleId))) {
         return interaction.reply({
           content: "❌ Bạn không có quyền sử dụng chức năng này!",
           ephemeral: true,
@@ -90,7 +91,8 @@ module.exports = async (interaction) => {
         ],
       });
     } else if (interaction.customId === "close_ticket") {
-      if (!member.roles.cache.has(roleSupport)) {
+      // Kiểm tra tương tự
+      if (!roleSupport.some((roleId) => member.roles.cache.has(roleId))) {
         return interaction.reply({
           content: "❌ Bạn không có quyền sử dụng chức năng này!",
           ephemeral: true,
@@ -114,37 +116,41 @@ module.exports = async (interaction) => {
           ? "Mua hàng"
           : "Hỗ trợ / Bảo hành";
 
+      // Tạo permissionOverwrites cho cả 2 role support
+      const permissionOverwrites = [
+        {
+          id: guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: user.id,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.AttachFiles,
+          ],
+        },
+        // Thêm quyền cho từng role trong mảng roleSupport
+        ...roleSupport.map((roleId) => ({
+          id: roleId,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+          ],
+        })),
+      ];
+
       const ticketChannel = await guild.channels.create({
         name: `💌┃${interaction.user.username}`,
         type: 0, // ChannelType.GuildText
         parent: ticketCategory,
         topic: user.id,
-        permissionOverwrites: [
-          {
-            id: guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.AttachFiles,
-            ],
-          },
-          {
-            id: roleSupport,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-            ],
-          },
-        ],
+        permissionOverwrites,
       });
 
       const embed = new EmbedBuilder()
         .setTitle("HeLa Store Ticket")
-        .setDescription(`\n\u200B**📌 Mô tả : ${reason}**\n\u200B`) // \u200B là khoảng trống giúp tạo khoảng cách
+        .setDescription(`\n\u200B**📌 Mô tả : ${reason}**\n\u200B`)
         .setColor("#FF9900")
         .setImage(
           "https://media.discordapp.net/attachments/1346922255023738922/1347246480121004133/Gif_Banner_Hela.gif?ex=67cb208f&is=67c9cf0f&hm=e329f37c93afab7db131ce4b61d6a2c43f5c110c0e993f0153a4d4ec4b6abcd5&=&width=720&height=405"
@@ -172,8 +178,12 @@ module.exports = async (interaction) => {
           .setStyle(ButtonStyle.Secondary)
       );
 
+      // Ping cả 2 role support
+      const roleMentions = roleSupport
+        .map((roleId) => `<@&${roleId}>`)
+        .join(" ");
       await ticketChannel.send({
-        content: `<@&${roleSupport}> | Ticket của <@${user.id}>`,
+        content: `${roleMentions} | Ticket của <@${user.id}>`,
         embeds: [embed],
         components: [row],
       });
@@ -184,3 +194,7 @@ module.exports = async (interaction) => {
     }
   }
 };
+// Đoạn này là để xử lý các sự kiện từ interaction, như là nhấn nút hoặc gửi modal
+// Tùy thuộc vào loại interaction mà sẽ thực hiện các hành động khác nhau
+// Như là tạo ticket, khoá ticket, mở khoá ticket, đóng ticket
+// Hoặc là hiển thị modal để nhập lý do tạo ticket
