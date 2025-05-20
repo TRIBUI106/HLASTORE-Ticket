@@ -8,11 +8,8 @@ const {
   TextInputStyle,
   PermissionsBitField,
 } = require("discord.js");
-const {
-  closedTicketCategory,
-  ticketCategory,
-  roleSupport,
-} = require("../config.js");
+const { closedTicketCategory, ticketCategory, roleSupport } = require("../config.js");
+const fs = require("fs").promises; // Sử dụng fs.promises để xử lý async
 
 module.exports = async (interaction) => {
   const user = interaction.user;
@@ -39,7 +36,6 @@ module.exports = async (interaction) => {
       const actionRow = new ActionRowBuilder().addComponents(reasonInput);
       modal.addComponents(actionRow);
 
-      // Gửi modal trực tiếp
       await interaction.showModal(modal);
     }
 
@@ -49,7 +45,7 @@ module.exports = async (interaction) => {
       if (!roleSupport.some((roleId) => member.roles.cache.has(roleId))) {
         return interaction.reply({
           content: "❌ Bạn không có quyền sử dụng chức năng này!",
-          flags: 64, // Ephemeral flag
+          flags: 64,
         });
       }
 
@@ -128,7 +124,7 @@ module.exports = async (interaction) => {
         const warningEmbed = new EmbedBuilder()
           .setTitle("⚠️ Cảnh Báo: Category Ticket Đã Đầy")
           .setDescription(
-            `Category **${closedCategory.name}** đã đạt giới hạn 50 kênh. Một category mới sẽ được tạo.`
+            `Category **${closedCategory.name}** đã đạt giới hạn 50 kênh. Một category mới sẽ được tạo và bot sẽ restart.`
           )
           .setColor("#FF0000")
           .addFields(
@@ -157,25 +153,27 @@ module.exports = async (interaction) => {
           ],
         });
 
-        // Cập nhật closedTicketCategory trong config.js (giả lập ghi file)
-        const fs = require("fs");
+        // Ghi file config.js với ID category mới
         const configPath = "./config.js";
-        let configContent = fs.readFileSync(configPath, "utf8");
-        configContent = configContent.replace(
+        const configContent = await fs.readFile(configPath, "utf8");
+        const updatedConfig = configContent.replace(
           /closedTicketCategory: "\d+"/,
           `closedTicketCategory: "${newCategory.id}"`
         );
-        fs.writeFileSync(configPath, configContent);
+        await fs.writeFile(configPath, updatedConfig);
 
         // Di chuyển ticket sang category mới
         await channel.send(
-          "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ!"
+          "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ! Bot sẽ restart để áp dụng category mới."
         );
         await channel.setParent(newCategory.id);
         await interaction.reply({
           content: "🔒 Ticket đã được đóng!",
           flags: 64,
         });
+
+        // Chủ động restart bot
+        process.exit(0);
       } else {
         // Di chuyển ticket vào category hiện tại
         await channel.send(
