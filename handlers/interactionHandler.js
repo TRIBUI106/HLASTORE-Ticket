@@ -111,14 +111,82 @@ module.exports = async (interaction) => {
         });
       }
 
-      await channel.send(
-        "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ!"
-      );
-      await channel.setParent(closedTicketCategory);
-      await interaction.reply({
-        content: "🔒 Ticket đã được đóng!",
-        flags: 64,
-      });
+      // Kiểm tra số lượng kênh trong closedTicketCategory
+      const closedCategory = await interaction.guild.channels.fetch(closedTicketCategory);
+      const channelCount = closedCategory.children.cache.size;
+
+      if (channelCount >= 50) {
+        // Gửi thông báo đến owner
+        const guild = interaction.guild;
+        const owner = await guild.members.fetch(guild.ownerId);
+        const date = new Date().toLocaleDateString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          timeZone: "Asia/Ho_Chi_Minh",
+        });
+
+        const warningEmbed = new EmbedBuilder()
+          .setTitle("⚠️ Cảnh Báo: Category Ticket Đã Đầy")
+          .setDescription(
+            `Category **${closedCategory.name}** đã đạt giới hạn 50 kênh. Một category mới sẽ được tạo.`
+          )
+          .setColor("#FF0000")
+          .addFields(
+            { name: "Guild", value: guild.name, inline: true },
+            { name: "Thời gian", value: date, inline: true }
+          )
+          .setThumbnail(guild.iconURL())
+          .setFooter({
+            text: "HeLa Store | Made With 💓",
+            iconURL:
+              "https://media.discordapp.net/attachments/1346922255023738922/1346922298124537946/logo.jpg?ex=67c9f2a4&is=67c8a124&hm=3428bc1859ded00165e8bacbd6ba3160a0f85449796ed5f2b3f5d0bc24e65a97&=&format=webp&width=670&height=670",
+          });
+
+        await owner.send({ embeds: [warningEmbed] });
+
+        // Tạo category mới
+        const newCategory = await guild.channels.create({
+          name: `Kho ticket từ ${date}`,
+          type: 4, // GuildCategory
+          permissionOverwrites: [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            ...roleSupport.map((roleId) => ({
+              id: roleId,
+              allow: [PermissionsBitField.Flags.ViewChannel],
+            })),
+          ],
+        });
+
+        // Cập nhật closedTicketCategory trong config.js (giả lập ghi file)
+        const fs = require("fs");
+        const configPath = "./config.js";
+        let configContent = fs.readFileSync(configPath, "utf8");
+        configContent = configContent.replace(
+          /closedTicketCategory: "\d+"/,
+          `closedTicketCategory: "${newCategory.id}"`
+        );
+        fs.writeFileSync(configPath, configContent);
+
+        // Di chuyển ticket sang category mới
+        await channel.send(
+          "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ!"
+        );
+        await channel.setParent(newCategory.id);
+        await interaction.reply({
+          content: "🔒 Ticket đã được đóng!",
+          flags: 64,
+        });
+      } else {
+        // Di chuyển ticket vào category hiện tại
+        await channel.send(
+          "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ!"
+        );
+        await channel.setParent(closedTicketCategory);
+        await interaction.reply({
+          content: "🔒 Ticket đã được đóng!",
+          flags: 64,
+        });
+      }
     }
   }
 
