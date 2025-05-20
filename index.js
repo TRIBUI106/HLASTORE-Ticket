@@ -1,8 +1,7 @@
 const { Client, GatewayIntentBits } = require("discord.js");
-const { prefix } = require("./config.js");
+const { prefix, token } = require("./config.js");
 const handleInteraction = require("./handlers/interactionHandler");
 const handleTicketCommand = require("./handlers/ticketHandler");
-require("dotenv").config();
 
 const client = new Client({
   intents: [
@@ -32,4 +31,4 @@ client.on("interactionCreate", async (interaction) => {
   handleInteraction(interaction);
 });
 
-client.login(process.env.TOKEN);
+client.login(token);
