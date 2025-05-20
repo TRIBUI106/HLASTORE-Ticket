@@ -8,8 +8,8 @@ const {
   TextInputStyle,
   PermissionsBitField,
 } = require("discord.js");
-const { closedTicketCategory, ticketCategory, roleSupport } = require("../config.js");
-const fs = require("fs").promises; // Sử dụng fs.promises để xử lý async
+const { closedTicketCategory, ticketCategory, roleSupport, ownerId } = require("../config.js");
+const fs = require("fs").promises;
 
 module.exports = async (interaction) => {
   const user = interaction.user;
@@ -112,68 +112,79 @@ module.exports = async (interaction) => {
       const channelCount = closedCategory.children.cache.size;
 
       if (channelCount >= 50) {
-        // Gửi thông báo đến owner
-        const guild = interaction.guild;
-        const owner = await guild.members.fetch(guild.ownerId);
-        const date = new Date().toLocaleDateString("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-          timeZone: "Asia/Ho_Chi_Minh",
-        });
-
-        const warningEmbed = new EmbedBuilder()
-          .setTitle("⚠️ Cảnh Báo: Category Ticket Đã Đầy")
-          .setDescription(
-            `Category **${closedCategory.name}** đã đạt giới hạn 50 kênh. Một category mới sẽ được tạo và bot sẽ restart.`
-          )
-          .setColor("#FF0000")
-          .addFields(
-            { name: "Guild", value: guild.name, inline: true },
-            { name: "Thời gian", value: date, inline: true }
-          )
-          .setThumbnail(guild.iconURL())
-          .setFooter({
-            text: "HeLa Store | Made With 💓",
-            iconURL:
-              "https://media.discordapp.net/attachments/1346922255023738922/1346922298124537946/logo.jpg?ex=67c9f2a4&is=67c8a124&hm=3428bc1859ded00165e8bacbd6ba3160a0f85449796ed5f2b3f5d0bc24e65a97&=&format=webp&width=670&height=670",
+        try {
+          // Gửi thông báo đến owner dựa trên ownerId từ config
+          const guild = interaction.guild;
+          const date = new Date().toLocaleDateString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            timeZone: "Asia/Ho_Chi_Minh",
           });
 
-        await owner.send({ embeds: [warningEmbed] });
+          const warningEmbed = new EmbedBuilder()
+            .setTitle("⚠️ Cảnh Báo: Category Ticket Đã Đầy")
+            .setDescription(
+              `Category **${closedCategory.name}** đã đạt giới hạn 50 kênh. Một category mới sẽ được tạo và bot sẽ restart.`
+            )
+            .setColor("#FF0000")
+            .addFields(
+              { name: "Guild", value: guild.name, inline: true },
+              { name: "Thời gian", value: date, inline: true }
+            )
+            .setThumbnail(guild.iconURL() || "https://media.discordapp.net/attachments/1346922255023738922/1346922298124537946/logo.jpg")
+            .setFooter({
+              text: "HeLa Store | Made With 💓",
+              iconURL:
+                "https://media.discordapp.net/attachments/1346922255023738922/1346922298124537946/logo.jpg?ex=67c9f2a4&is=67c8a124&hm=3428bc1859ded00165e8bacbd6ba3160a0f85449796ed5f2b3f5d0bc24e65a97&=&format=webp&width=670&height=670",
+            });
 
-        // Tạo category mới
-        const newCategory = await guild.channels.create({
-          name: `Kho ticket từ ${date}`,
-          type: 4, // GuildCategory
-          permissionOverwrites: [
-            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-            ...roleSupport.map((roleId) => ({
-              id: roleId,
-              allow: [PermissionsBitField.Flags.ViewChannel],
-            })),
-          ],
-        });
+          // Gửi embed tới ownerId
+          const owner = await interaction.client.users.fetch(ownerId);
+          await owner.send({ embeds: [warningEmbed] }).catch((error) => {
+            console.error(`Không thể gửi DM tới owner (${ownerId}): ${error.message}`);
+          });
 
-        // Ghi file config.js với ID category mới
-        const configPath = "./config.js";
-        const configContent = await fs.readFile(configPath, "utf8");
-        const updatedConfig = configContent.replace(
-          /closedTicketCategory: "\d+"/,
-          `closedTicketCategory: "${newCategory.id}"`
-        );
-        await fs.writeFile(configPath, updatedConfig);
+          // Tạo category mới
+          const newCategory = await guild.channels.create({
+            name: `Kho ticket từ ${date}`,
+            type: 4, // GuildCategory
+            permissionOverwrites: [
+              { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+              ...roleSupport.map((roleId) => ({
+                id: roleId,
+                allow: [PermissionsBitField.Flags.ViewChannel],
+              })),
+            ],
+          });
 
-        // Di chuyển ticket sang category mới
-        await channel.send(
-          "🔒 Bot sẽ restart để áp dụng kho mới ! Thử lại sau 3s"
-        );
-        await channel.setParent(newCategory.id);
-        await interaction.reply({
-          content: "🔒 Ticket đã được đóng!",
-          flags: 64,
-        });
+          // Ghi file config.js với ID category mới
+          const configPath = "./config.js";
+          const configContent = await fs.readFile(configPath, "utf8");
+          const updatedConfig = configContent.replace(
+            /closedTicketCategory: "\d+"/,
+            `closedTicketCategory: "${newCategory.id}"`
+          );
+          await fs.writeFile(configPath, updatedConfig);
 
-        // Chủ động restart bot
-        process.exit(0);
+          // Di chuyển ticket sang category mới
+          await channel.send(
+            "🔒 Bot sẽ restart để áp dụng kho mới ! Thử lại sau 3s"
+          );
+          await channel.setParent(newCategory.id);
+          await interaction.reply({
+            content: "🔒 Ticket đã được đóng!",
+            flags: 64,
+          });
+
+          // Chủ động restart bot
+          process.exit(0);
+        } catch (error) {
+          console.error(`Lỗi khi xử lý đóng ticket: ${error.message}`);
+          await interaction.reply({
+            content: "❌ Có lỗi xảy ra khi đóng ticket. Vui lòng thử lại!",
+            flags: 64,
+          });
+        }
       } else {
         // Di chuyển ticket vào category hiện tại
         await channel.send(
