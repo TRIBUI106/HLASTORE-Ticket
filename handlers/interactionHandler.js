@@ -164,7 +164,7 @@ module.exports = async (interaction) => {
 
         // Di chuyển ticket sang category mới
         await channel.send(
-          "🔒 Ticket này đã được đóng và di chuyển vào lưu trữ! Bot sẽ restart để áp dụng category mới."
+          "🔒 Bot sẽ restart để áp dụng kho mới ! Thử lại sau 3s"
         );
         await channel.setParent(newCategory.id);
         await interaction.reply({
