@@ -120,6 +120,14 @@ module.exports = async (interaction) => {
           });
         }
 
+        // Xóa permission ViewChannel của @everyone và tất cả role có trong channel
+        const permissionOverwrites = channel.permissionOverwrites.cache;
+        for (const [id, overwrite] of permissionOverwrites) {
+          await channel.permissionOverwrites.edit(id, {
+            ViewChannel: false,
+          });
+        }
+
         // Kiểm tra số lượng kênh trong closedTicketCategory
         const closedCategory = await interaction.guild.channels.fetch(
           closedTicketCategory
